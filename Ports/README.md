@@ -1,0 +1,1 @@
+I sometimes consider myself as a function that maps one thing to another. Not always bijection.
