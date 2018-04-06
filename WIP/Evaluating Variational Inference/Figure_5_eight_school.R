@@ -55,12 +55,23 @@ theta=theta_trans*tau+mu;
 }
 model {
 theta_trans ~normal (0,1);
-y ~ normal(theta, sigma);
+for(j in 1:J){
+y[j] ~ normal(theta[j], sigma[j]);
+}
+// y ~ normal(theta, sigma);
 }'
+
+J = 8
+y = c(28,  8, -3,  7, -1,  1, 18, 12)
+sigma = c(15, 10, 16, 11,  9, 11, 10, 18)
 
 fit_school2=stan(model_code = school_code_cp, data=list(y=y, sigma=sigma, J=8),iter=5000,control = list(stepsize = 0.5, adapt_delta = 0.9 ))
 
-
+log_lik_2 <- extract_log_lik(fit_school2, "lp__")
+pw_2 <- psislw(-log_lik_2)
+pareto_k_table(pw_2)
+#loo_2 <- loo(log_lik_2)
+#print(loo_2)
 
 ####1 centered parametrization
 
@@ -81,10 +92,10 @@ model {
 }'
 
 ##########fit stan and vb
-y=c(28,8,-3,7,-1,1,18,12)
-sigma=c(15, 10, 16, 11, 9,11,10,18)
-J=8
-fit_school=stan(model_code = school_code, data=list(y=y, sigma=sigma, J=8),iter=5000,control = list( stepsize = 0.5, adapt_delta = 0.995 ))
+fit_school=stan(model_code = school_code, data=list(y=y, sigma=sigma, J=J),iter=5000,control = list( stepsize = 0.5, adapt_delta = 0.995 ))
+log_lik_ <- extract_log_lik(fit_school, "lp__")
+pw_ <- psislw(-log_lik_)
+pareto_k_table(pw_)
 
 stan_samples=extract(fit_school)
 mu_sample=stan_samples[["mu"]]
