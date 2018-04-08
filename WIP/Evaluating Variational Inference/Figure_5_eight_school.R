@@ -3,6 +3,8 @@
 #### figure 5 and more ########
 library(loo)
 library(rstan)
+library(ggplot2)
+library(bayesplot)
 log_proposal_lik_one_sample=function(beta_one_sample, mu,sd ){
   return( sum (dnorm(beta_one_sample[1:9],mean=mu[1:9],sd=sd[1:9],log = TRUE)[1:9])+ dnorm(log(beta_one_sample[10]),mean=mu[10],sd=sd[10],log = TRUE) +  log(beta_one_sample[10]) )
 }
@@ -55,10 +57,13 @@ theta=theta_trans*tau+mu;
 }
 model {
 theta_trans ~normal (0,1);
-for(j in 1:J){
-y[j] ~ normal(theta[j], sigma[j]);
+y ~ normal(theta, sigma);
 }
-// y ~ normal(theta, sigma);
+generated quantities {
+vector[J] log_lik;
+for (n in 1:J){
+log_lik[n] = normal_lpdf(y[n] | theta[n], sigma[n]);
+}
 }'
 
 J = 8
@@ -67,12 +72,27 @@ sigma = c(15, 10, 16, 11,  9, 11, 10, 18)
 
 fit_school2=stan(model_code = school_code_cp, data=list(y=y, sigma=sigma, J=8),iter=5000,control = list(stepsize = 0.5, adapt_delta = 0.9 ))
 
-log_lik_2 <- extract_log_lik(fit_school2, "lp__")
-pw_2 <- psislw(-log_lik_2)
-pareto_k_table(pw_2)
+log_lik_2 <- extract_log_lik(fit_school2)
+psis2 <- psislw(-log_lik_2)
+pareto_k_table(psis2)
 #loo_2 <- loo(log_lik_2)
 #print(loo_2)
 
+theme_update(axis.text = element_text(size = 16))
+k2 <- psis2$pareto_k
+kdata <- data.frame(Index = seq_along(k2), khat = k2)
+ggplot(kdata, aes(x = Index, y = khat)) + 
+  hline_at(c(0, 0.5, 0.75, 1), size = 0.25, linetype = 2, color = "gray") +
+  geom_point(size = 0.5, alpha = 0.9) + 
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  labs(y = "k-hat") + 
+  annotate(
+    "text", 
+    x = pareto_k_ids(psis2, 0.7), 
+    y = kdata$khat[pareto_k_ids(psis2, 0.7)] - 0.04, 
+    label = pareto_k_ids(psis2, 0.7), 
+    color = "red", size = 4
+  ) 
 ####1 centered parametrization
 
 school_code='
@@ -89,14 +109,40 @@ parameters {
 model {
    theta ~ normal(mu, tau);
    y ~ normal(theta, sigma);
+}
+generated quantities {
+vector[J] log_lik;
+for (n in 1:J){
+log_lik[n] = normal_lpdf(y[n] | theta[n], sigma[n]);
+}
 }'
 
 ##########fit stan and vb
 fit_school=stan(model_code = school_code, data=list(y=y, sigma=sigma, J=J),iter=5000,control = list( stepsize = 0.5, adapt_delta = 0.995 ))
-log_lik_ <- extract_log_lik(fit_school, "lp__")
-pw_ <- psislw(-log_lik_)
-pareto_k_table(pw_)
+log_lik_ <- extract_log_lik(fit_school)
+psis1 <- psislw(-log_lik_)
+pareto_k_table(psis1)
 
+#####
+#plot
+theme_update(axis.text = element_text(size = 16))
+k2 <- psis1$pareto_k
+kdata <- data.frame(Index = seq_along(k2), khat = k2)
+ggplot(kdata, aes(x = Index, y = khat)) + 
+  hline_at(c(0, 0.5, 0.75, 1), size = 0.25, linetype = 2, color = "gray") +
+  geom_point(size = 0.5, alpha = 0.9) + 
+  scale_y_continuous(breaks = c(0, 0.5, 1)) +
+  labs(y = "k-hat") + 
+  annotate(
+    "text", 
+    x = pareto_k_ids(psis1, 0.7), 
+    y = kdata$khat[pareto_k_ids(psis1, 0.7)] - 0.04, 
+    label = pareto_k_ids(psis1, 0.7), 
+    color = "red", size = 4
+  ) 
+
+
+#####
 stan_samples=extract(fit_school)
 mu_sample=stan_samples[["mu"]]
 tau_sample=stan_samples[["tau"]]
